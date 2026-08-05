@@ -1,0 +1,49 @@
+services:
+
+  postgres:
+    image: postgres:17
+    container_name: cdc-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: orders
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  kafka:
+    image: quay.io/debezium/kafka:3.2
+    container_name: cdc-kafka
+    hostname: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      CLUSTER_ID: "cdc-orders-cluster"
+      NODE_ID: "1"
+      NODE_ROLE: "combined"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_LISTENERS: "PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
+
+  connect:
+    image: quay.io/debezium/connect:3.2
+    container_name: cdc-connect
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: "kafka:9092"
+      GROUP_ID: "cdc-connect"
+      CONFIG_STORAGE_TOPIC: "cdc_connect_configs"
+      OFFSET_STORAGE_TOPIC: "cdc_connect_offsets"
+      STATUS_STORAGE_TOPIC: "cdc_connect_statuses"
+    depends_on:
+      - postgres
+      - kafka
+
+volumes:
+  postgres_data:
